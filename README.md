@@ -12,13 +12,28 @@ A library management API built with NestJS, Prisma ORM and PostgreSQL.
 
 ## Database Schema
 
-The database contains three main models:
+The database contains four main models:
 
 - **User:** Stores library users and their roles.
 - **Genre:** Stores book genres.
 - **Book:** Stores book information and references its genre.
+- **Review:** Stores reviews submitted by users about books.
 
 The Role enum defines two user roles: PATRON and LIBRARIAN.
+
+### Model Relationships
+
+- One Genre can have many Books, while each Book belongs to one Genre.
+- One Book can have many Reviews, while each Review belongs to one Book.
+- One User can write many Reviews, while each Review belongs to one User.
+
+The Review model contains the following fields:
+
+- `bookId`: Foreign key referencing the reviewed book.
+- `userId`: Foreign key referencing the user who submitted the review.
+- `rating`: The rating given to the book.
+- `comment`: Written feedback from the user.
+- `createdAt`: Date and time the review was created.
 
 ## Schema Decisions
 
@@ -28,7 +43,9 @@ This design was chosen because one genre can be associated with many books, whil
 
 The relationship also improves data consistency. For example, if a genre name changes, it only needs to be updated once in the Genre table. The foreign key relationship helps maintain referential integrity by ensuring that each book references an existing genre.
 
-This relational design is suitable for a library system because books and genres have a clear one-to-many relationship.
+The Review model uses foreign keys (`bookId` and `userId`) to connect reviews to their respective books and users. This ensures that each review is associated with an existing book and an existing library user.
+
+This relational design is suitable for a library system because books, genres, users and reviews have structured relationships and benefit from data consistency.
 
 ## Database Seeding
 
@@ -52,29 +69,29 @@ npx prisma db seed
 2. Navigate into the `api` folder.
 3. Install dependencies:
 
-```bash
-npm install
-```
+   ```bash
+   npm install
+   ```
 
 4. Create a `.env` file using `.env.example` as a template.
 5. Add your PostgreSQL connection string to the `.env` file.
 6. Run database migrations:
 
-```bash
-npx prisma migrate dev
-```
+   ```bash
+   npx prisma migrate dev
+   ```
 
 7. Seed the database:
 
-```bash
-npx prisma db seed
-```
+   ```bash
+   npx prisma db seed
+   ```
 
 8. Start the development server:
 
-```bash
-npm run start:dev
-```
+   ```bash
+   npm run start:dev
+   ```
 
 ## Prisma ORM vs Document Databases
 
@@ -82,4 +99,6 @@ Prisma ORM provides a structured way to work with relational databases such as P
 
 A document database stores data in flexible document structures, which can be useful when records have varying fields or complex nested data.
 
-For this library system, PostgreSQL with Prisma is appropriate because users, books and genres have structured relationships and benefit from data consistency.
+One thing that felt different when modelling in Prisma compared to a document database was defining relationships explicitly using foreign keys. In Prisma, I had to define how books connect to genres and how reviews connect to books and users. In a document database, related information can instead be stored together inside a document.
+
+For this library system, PostgreSQL with Prisma is appropriate because users, books, genres and reviews have structured relationships and benefit from data consistency.

@@ -20,6 +20,9 @@ model User {
   email     String   @unique
   role      Role     @default(PATRON)
   createdAt DateTime @default(now())
+
+  // A user can write many reviews
+  reviews   Review[]
 }
 
 // Stores book genres
@@ -42,5 +45,22 @@ model Book {
   genreId     Int
   genre       Genre    @relation(fields: [genreId], references: [id])
 
+  // A book can receive many reviews
+  reviews     Review[]
+
   createdAt   DateTime @default(now())
+}
+
+// Stores reviews submitted by library users
+model Review {
+  id        Int      @id @default(autoincrement())
+  bookId    Int
+  userId    Int
+  rating    Int
+  comment   String
+  createdAt DateTime @default(now())
+
+  // Connects each review to a book and a user
+  book      Book     @relation(fields: [bookId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
