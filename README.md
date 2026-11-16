@@ -1,104 +1,229 @@
 # Library Management System
 
-A library management API built with NestJS, Prisma ORM and PostgreSQL.
+A robust, modern RESTful Library Management API built with NestJS, Prisma ORM and PostgreSQL.
+
+This project provides complete management of books and genres, user authentication, role-based access control (RBAC) distinguishing library patrons from librarians, and a book review system.
+
+---
 
 ## Technologies Used
 
-- NestJS – Backend application framework
-- Prisma ORM – Database modelling and management
-- PostgreSQL – Relational database
-- Neon – Hosted PostgreSQL database
-- TypeScript – Programming language
+- **NestJS** – Enterprise-grade backend framework for scalable Node.js applications
+- **Prisma ORM** – Type-safe database client, schema modelling and automated migrations
+- **PostgreSQL** – Relational database management system
+- **Neon** – Serverless cloud-hosted PostgreSQL database
+- **TypeScript** – Strongly typed programming language
+- **Passport & JWT** (`@nestjs/passport`, `@nestjs/jwt`, `passport-jwt`) – Stateless token-based authentication and route protection
+- **bcrypt** – Cryptographic password hashing
+- **class-validator & class-transformer** – Request payload validation and transformation
+
+---
 
 ## Database Schema
 
-The database contains four main models:
+The database is defined in `api/prisma/schema.prisma` and contains four core models and a role enumeration:
 
-- **User:** Stores library users and their roles.
-- **Genre:** Stores book genres.
-- **Book:** Stores book information and references its genre.
-- **Review:** Stores reviews submitted by users about books.
+### Roles Enum (`Role`)
+Defines the two user privilege levels:
+- `PATRON` – Standard library user (default for registered accounts).
+- `LIBRARIAN` – Privileged administrative user with access to create, update and delete books.
 
-The Role enum defines two user roles: PATRON and LIBRARIAN.
+---
+
+### Models and Fields
+
+#### 1. `User`
+Stores library users, their credentials and authorization roles.
+- `id` (`Int`, Primary Key): Auto-incrementing identifier.
+- `name` (`String`): Full name of the user.
+- `email` (`String`, Unique): User's unique email address used for login.
+- `password` (`String`): Securely hashed password (bcrypt).
+- `role` (`Role`, Default: `PATRON`): User's access role.
+- `createdAt` (`DateTime`, Default: `now()`): Account registration timestamp.
+- `reviews` (`Review[]`): One-to-many relationship with user reviews.
+
+#### 2. `Genre`
+Stores categories used to classify books.
+- `id` (`Int`, Primary Key): Auto-incrementing identifier.
+- `name` (`String`, Unique): Unique name of the genre (e.g. Fiction, Business, Technology, History).
+- `books` (`Book[]`): One-to-many relationship with books in this genre.
+- `createdAt` (`DateTime`, Default: `now()`): Creation timestamp.
+
+#### 3. `Book`
+Stores book records, inventory levels and genre associations.
+- `id` (`Int`, Primary Key): Auto-incrementing identifier.
+- `title` (`String`): Title of the book.
+- `author` (`String`): Author of the book.
+- `description` (`String?`, Optional): Summary or description of the book.
+- `published` (`Boolean`, Default: `true`): Publication status indicator.
+- `isbn` (`String?`, Unique): Unique International Standard Book Number.
+- `totalCopies` (`Int`, Default: `5`): Total number of physical copies owned by the library.
+- `genreId` (`Int`, Foreign Key): References the associated `Genre.id`.
+- `genre` (`Genre`): Relation connecting the book to its genre.
+- `reviews` (`Review[]`): One-to-many relationship with book reviews.
+- `createdAt` (`DateTime`, Default: `now()`): Record creation timestamp.
+
+#### 4. `Review`
+Stores reader reviews and ratings for books.
+- `id` (`Int`, Primary Key): Auto-incrementing identifier.
+- `bookId` (`Int`, Foreign Key): References the reviewed `Book.id`.
+- `userId` (`Int`, Foreign Key): References the authoring `User.id`.
+- `rating` (`Int`): Rating given to the book.
+- `comment` (`String`): Written review feedback.
+- `createdAt` (`DateTime`, Default: `now()`): Review creation timestamp.
+- `book` (`Book`): Relation connecting the review to the reviewed book.
+- `user` (`User`): Relation connecting the review to the reviewing user.
+
+---
 
 ### Model Relationships
 
-- One Genre can have many Books, while each Book belongs to one Genre.
-- One Book can have many Reviews, while each Review belongs to one Book.
-- One User can write many Reviews, while each Review belongs to one User.
+- **Genre $\rightarrow$ Book (One-to-Many):** One genre can have many books. Each book references exactly one genre via `genreId`.
+- **Book $\rightarrow$ Review (One-to-Many):** One book can receive many reviews. Each review belongs to a single book via `bookId`.
+- **User $\rightarrow$ Review (One-to-Many):** One user can write multiple reviews. Each review is linked to a single user via `userId`.
 
-The Review model contains the following fields:
+---
 
-- `bookId`: Foreign key referencing the reviewed book.
-- `userId`: Foreign key referencing the user who submitted the review.
-- `rating`: The rating given to the book.
-- `comment`: Written feedback from the user.
-- `createdAt`: Date and time the review was created.
+### Schema Decisions
 
-## Schema Decisions
+1. **Normalized Genre Storage:** The `Book` model references the `Genre` table via `genreId` rather than embedding genre names as plain strings. This eliminates redundant data, enforces relational integrity, and ensures that renaming a genre propagates across all linked books automatically.
+2. **Dedicated Review Entity:** Reviews use foreign keys (`bookId` and `userId`) to connect feedback directly to both the book and the reviewing user, guaranteeing referential consistency and preventing orphaned review records.
+3. **Password Security:** The `User` model stores a hashed password string generated using `bcrypt` with salt rounds, ensuring raw credentials are never persisted in plaintext.
 
-The Book model references the Genre model through a foreign key called `genreId` instead of embedding genre information directly inside each book record.
-
-This design was chosen because one genre can be associated with many books, while each book belongs to a particular genre. Separating genres into their own table avoids repeating genre information in every book record.
-
-The relationship also improves data consistency. For example, if a genre name changes, it only needs to be updated once in the Genre table. The foreign key relationship helps maintain referential integrity by ensuring that each book references an existing genre.
-
-The Review model uses foreign keys (`bookId` and `userId`) to connect reviews to their respective books and users. This ensures that each review is associated with an existing book and an existing library user.
-
-This relational design is suitable for a library system because books, genres, users and reviews have structured relationships and benefit from data consistency.
-
-## Database Seeding
-
-The seed script is located at `api/prisma/seed.ts`.
-
-It creates or verifies:
-
-- 4 genres: Fiction, Business, Technology and History.
-- 16 sample books distributed across the four genres.
-
-To seed the database, run:
-
-```bash
-cd api
-npx prisma db seed
-```
+---
 
 ## Setup Instructions
 
-1. Clone this repository.
-2. Navigate into the `api` folder.
-3. Install dependencies:
+Follow these step-by-step instructions to set up, migrate, seed and run the application locally:
 
-   ```bash
-   npm install
-   ```
+### 1. Clone the Repository
+```bash
+git clone <repository-url>
+cd library-management-system
+```
 
-4. Create a `.env` file using `.env.example` as a template.
-5. Add your PostgreSQL connection string to the `.env` file.
-6. Run database migrations:
+### 2. Enter the API Directory
+```bash
+cd api
+```
 
-   ```bash
-   npx prisma migrate dev
-   ```
+### 3. Install Dependencies
+```bash
+npm install
+```
 
-7. Seed the database:
+### 4. Create Local Environment Configuration
+Create a local `.env` file by copying the provided example template:
 
-   ```bash
-   npx prisma db seed
-   ```
+```bash
+# On Linux / macOS / Git Bash:
+cp .env.example .env
 
-8. Start the development server:
+# On Windows PowerShell:
+Copy-Item .env.example .env
+```
 
-   ```bash
-   npm run start:dev
-   ```
+### 5. Configure Environment Variables
+Open `api/.env` in your text editor and set values for the three required variables:
+
+- `DATABASE_URL`: Your PostgreSQL connection string (such as one from [Neon](https://neon.tech)):
+  ```env
+  DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE?sslmode=require"
+  ```
+- `JWT_SECRET`: A secure random secret key used to sign and verify JSON Web Tokens:
+  ```env
+  JWT_SECRET="your-secure-jwt-secret-key"
+  ```
+- `LIBRARIAN_PASSWORD`: A secure initial password for the seeded librarian account:
+  ```env
+  LIBRARIAN_PASSWORD="your-strong-librarian-password"
+  ```
+
+### 6. Run Database Migrations
+Apply the Prisma migration files to create the tables, relations and enums in your database:
+```bash
+npx prisma migrate dev
+```
+
+### 7. Seed the Database
+Populate your database with initial sample data and the librarian administrator account:
+```bash
+npx prisma db seed
+```
+
+The seed script (`api/prisma/seed.ts`) automatically creates:
+- **4 Genres:** Fiction, Business, Technology, and History.
+- **1 Librarian Account:** `librarian@library.com` with the password specified by `LIBRARIAN_PASSWORD` in your `.env`.
+- **16 Sample Books:** Complete with authors, descriptions, unique ISBNs, and initial inventory copies distributed across all four genres.
+
+### 8. Start the Development Server
+```bash
+npm run start:dev
+```
+The application will launch with hot-reload enabled at:
+`http://localhost:3000`
+
+---
+
+## API Endpoints
+
+All endpoints accept and return JSON payloads. Protected endpoints require a Bearer token in the `Authorization` header (`Bearer <access_token>`).
+
+### 1. Authentication (`/auth`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/auth/register` | Public | Register a new user account (assigned role `PATRON` by default). |
+| `POST` | `/auth/login` | Public | Authenticate with email and password; returns an `access_token` (JWT). |
+
+---
+
+### 2. Genres (`/genres`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/genres` | Public | Retrieve a list of all genres. |
+| `GET` | `/genres/:id` | Public | Retrieve details of a single genre by ID. |
+| `POST` | `/genres` | Public | Create a new genre (`{ "name": "..." }`). |
+| `PATCH` | `/genres/:id` | Public | Update an existing genre name. |
+| `DELETE` | `/genres/:id` | Public | Delete a genre by ID. |
+
+---
+
+### 3. Books (`/books`)
+
+| Method | Endpoint | Access | Description |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/books` | Public | Retrieve books with optional query filtering (`?search=`, `?genreId=`, `?page=`, `?limit=`). |
+| `GET` | `/books/:id` | Public | Retrieve details of a single book by ID. |
+| `POST` | `/books` | **Librarian Only** | Add a new book. Requires valid JWT with `Role.LIBRARIAN`. |
+| `PATCH` | `/books/:id` | **Librarian Only** | Update an existing book's details or copy counts. |
+| `DELETE` | `/books/:id` | **Librarian Only** | Delete a book record by ID. |
+
+#### Book Query Parameters Example:
+- **Search by title or author:** `GET /books?search=Clean`
+- **Filter by genre:** `GET /books?genreId=3`
+- **Pagination:** `GET /books?page=1&limit=5`
+- **Combined:** `GET /books?genreId=1&search=Achebe&page=1&limit=5`
+
+---
+
+## Postman Testing
+
+A pre-configured Postman collection is available under `api/docs/postman_collection.json`. It includes:
+- Automated token capture on successful login for both `patronToken` and `librarianToken`.
+- Dynamic ISBN generation for book creation tests.
+- Chained CRUD tests that automatically capture and reuse `testGenreId` and `testBookId`.
+- Role-based authorization tests (verifying that librarians succeed and patrons receive `403 Forbidden` on protected book management endpoints).
+
+---
 
 ## Prisma ORM vs Document Databases
 
-Prisma ORM provides a structured way to work with relational databases such as PostgreSQL. It supports models, relationships, foreign keys and type-safe database queries.
+Prisma ORM provides a structured way to work with relational databases such as PostgreSQL. It supports strongly-typed models, relations, foreign keys, automated schema migrations and type-safe database queries.
 
-A document database stores data in flexible document structures, which can be useful when records have varying fields or complex nested data.
+A document database stores data in flexible document structures (e.g. JSON/BSON), which can be useful when records have varying fields or deeply nested, self-contained data.
 
-One thing that felt different when modelling in Prisma compared to a document database was defining relationships explicitly using foreign keys. In Prisma, I had to define how books connect to genres and how reviews connect to books and users. In a document database, related information can instead be stored together inside a document.
+When modelling in Prisma compared to a document database, relationships are defined explicitly using foreign keys and relational constraints. In Prisma, we explicitly define how books connect to genres and how reviews connect to both books and users. In a document database, related data might instead be duplicated or nested directly inside a single document.
 
-For this library system, PostgreSQL with Prisma is appropriate because users, books, genres and reviews have structured relationships and benefit from data consistency.
+For this library management system, PostgreSQL with Prisma ORM is particularly well-suited because users, books, genres and reviews have clear, structured relationships that benefit heavily from ACID compliance, referential integrity and data consistency.
