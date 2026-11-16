@@ -7,25 +7,21 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Defines the two types of library users
 enum Role {
   PATRON
   LIBRARIAN
 }
 
-// Stores library users
 model User {
   id        Int      @id @default(autoincrement())
   name      String
   email     String   @unique
+  password  String
   role      Role     @default(PATRON)
   createdAt DateTime @default(now())
-
-  // A user can write many reviews
   reviews   Review[]
 }
 
-// Stores book genres
 model Genre {
   id        Int      @id @default(autoincrement())
   name      String   @unique
@@ -33,25 +29,20 @@ model Genre {
   createdAt DateTime @default(now())
 }
 
-// Stores the library's books
 model Book {
   id          Int      @id @default(autoincrement())
   title       String
   author      String
   description String?
   published   Boolean  @default(true)
-
-  // Foreign key connecting a book to its genre
+  isbn        String?  @unique
+  totalCopies Int      @default(5)
   genreId     Int
   genre       Genre    @relation(fields: [genreId], references: [id])
-
-  // A book can receive many reviews
   reviews     Review[]
-
   createdAt   DateTime @default(now())
 }
 
-// Stores reviews submitted by library users
 model Review {
   id        Int      @id @default(autoincrement())
   bookId    Int
@@ -59,8 +50,6 @@ model Review {
   rating    Int
   comment   String
   createdAt DateTime @default(now())
-
-  // Connects each review to a book and a user
   book      Book     @relation(fields: [bookId], references: [id])
   user      User     @relation(fields: [userId], references: [id])
 }
